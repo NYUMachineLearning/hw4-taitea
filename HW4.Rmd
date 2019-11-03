@@ -164,6 +164,99 @@ importance(rfmodel)
 
 1. Compare the most important features from at least 2 different classes of feature selection methods covered in this tutorial with any reasonable machine learning dataset from mlbench. Do these feature selection methods provide similar results? 
 
+```{r}
+##dataset selection and exploration
+data(PimaIndiansDiabetes)
+head(PimaIndiansDiabetes)
+dim(PimaIndiansDiabetes)
+##summary of outcome variable of interest
+summary(PimaIndiansDiabetes$diabetes)
+```
+
+```{r}
+##WRecursive Feature Elimination
+PimaIndians = transform(PimaIndiansDiabetes, pregnant = as.numeric(pregnant), 
+                         glucose = as.numeric(glucose),
+                         pressure = as.numeric(pressure),
+                         triceps = as.numeric(triceps), 
+                         insulin = as.numeric(insulin),
+                         mass = as.numeric(mass),
+                         pedigree = as.numeric(pedigree), 
+                         age = as.numeric(age))
+
+PimaIndians[is.na(PimaIndians)] = 0
+control = rfeControl(functions = caretFuncs, number = 2)
+results = rfe(PimaIndians[,1:8], PimaIndians[,9], sizes = c(2,5,9), rfeControl = control, method = "svmRadial")
+
+##RFE output
+results
+results$variables
+```
+
+```{r}
+##Random Forest
+data("PimaIndiansDiabetes")
+train_size <- floor(0.75 * nrow(PimaIndiansDiabetes))
+set.seed(24)
+train_pos <- sample(seq_len(nrow(PimaIndiansDiabetes)), size = train_size)
+
+PimaIndians = transform(PimaIndiansDiabetes, pregnant = as.numeric(pregnant), 
+                         glucose = as.numeric(glucose),
+                         pressure = as.numeric(pressure),
+                         triceps = as.numeric(triceps), 
+                         insulin = as.numeric(insulin),
+                         mass = as.numeric(mass),
+                         pedigree = as.numeric(pedigree), 
+                         age = as.numeric(age))
+PimaIndians[is.na(PimaIndians)] = 0
+
+train_classification <- PimaIndians[train_pos, ]
+test_classification <- PimaIndians[-train_pos, ]
+rfmodel = randomForest(diabetes ~ ., data=train_classification,  importance = TRUE, oob.times = 15, confusion = TRUE)
+
+##Random Forest feature selection output
+importance(rfmodel)
+```
+
+Both Recursive Feature Selection and Random Forest for feature selection identified glucose, mass, and age as the most significant predictor variables in decending order. While there was high agreement between the two methods for the top 3 features, there was some deviation with less significant predictors. RFE found pregnancy and pedigree to be the next most significant, whereas RF found insulin and pregnancy to be the next most significant. Overall, the results of the two methods are quite similar.
+
 2. Attempt a feature selection method not covered in this tutorial (backward elimination, forward propogation, etc.)
 
+```{r, message=FALSE}
+##load required library for stepwise regression
+library(MASS)
+```
 
+```{r}
+##Backward elimination of logistic regression
+##load dataset
+data("PimaIndiansDiabetes")
+
+##transform variables to numeric and eliminate any missing values
+PimaIndians = transform(PimaIndiansDiabetes, pregnant = as.numeric(pregnant), 
+                         glucose = as.numeric(glucose),
+                         pressure = as.numeric(pressure),
+                         triceps = as.numeric(triceps), 
+                         insulin = as.numeric(insulin),
+                         mass = as.numeric(mass),
+                         pedigree = as.numeric(pedigree), 
+                         age = as.numeric(age))
+PimaIndians[is.na(PimaIndians)] = 0
+
+##subset dataset into train and test
+train_size <- floor(0.75 * nrow(PimaIndiansDiabetes))
+set.seed(24)
+train_pos <- sample(seq_len(nrow(PimaIndiansDiabetes)), size = train_size)
+train_classification <- PimaIndians[train_pos, ]
+test_classification <- PimaIndians[-train_pos, ]
+
+##build logistic regression model
+logmodel <- glm(diabetes ~., data = train_classification, family = binomial)
+##perform backward elimination on the model created
+step <- stepAIC(logmodel, direction="backward")
+
+##visualize results
+step$anova
+```
+
+Backward Elimination seems to be in high agreement with RFE in evaluating insulin as the least significant predictor variable. The final model includes all variables except this one.
